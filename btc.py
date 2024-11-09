@@ -1,39 +1,112 @@
 import yfinance as yf
 import plotly.graph_objects as go
 from datetime import datetime as dt
+import easygui
+import webbrowser
 
+# Default cryptocurrency symbol
 CRYPTO_NAME = 'BTC-USD'
 
-def get_data():
-    start_date = '2024-01-01'
-    end_date = dt.now().strftime("%Y-%m-%d")
- 
-    data = yf.download(CRYPTO_NAME, start=start_date, end=end_date)
-    return data
+# Function to fetch data from Yahoo Finance
+def get_data(symbol):
+    try:
+        start_date = '2024-01-01'
+        end_date = dt.now().strftime("%Y-%m-%d")
 
+        # Download the data for the given cryptocurrency symbol
+        data = yf.download(symbol, start=start_date, end=end_date)
+
+        if data.empty:
+            raise ValueError(f"No data found for the given cryptocurrency symbol: {symbol}")
+        return data
+
+    except Exception as e:
+        easygui.msgbox(f"Error occurred while fetching data: {e}", title="Error")
+        return None
+
+# Function to create the graph
+def create_graph(data):
+    try:
+        # Create the candlestick chart with moving average
+        graph = go.Figure(data=[ 
+            go.Candlestick(
+                x=data.index,
+                open=data['Open'],
+                high=data['High'],
+                low=data['Low'],
+                close=data['Close'],
+                name='Candlesticks',
+                increasing_line_color='blue',  # Color for upward movements
+                decreasing_line_color='grey'    # Color for downward movements
+            ),
+            go.Scatter(
+                x=data.index,
+                y=data['Close'].rolling(window=30).mean(),
+                name='30 Day Moving Average',
+                mode='lines'
+            )
+        ])
+
+        # Update the layout of the graph
+        graph.update_layout(title=f'{CRYPTO_NAME} Price Graph Analysis', yaxis_title='Price (USD)')
+
+        # Save the graph as an HTML file to view in a browser
+        graph.write_html("crypto_graph.html")
+
+        return "crypto_graph.html"
+
+    except Exception as e:
+        easygui.msgbox(f"Error occurred while generating the graph: {e}", title="Error")
+        return None
+
+# Function to prompt the user to change the cryptocurrency symbol
+def get_symbol_from_user():
+    global CRYPTO_NAME
+
+    # Ask the user to enter a new cryptocurrency symbol
+    new_symbol = easygui.enterbox("Enter the cryptocurrency symbol (e.g., BTC-USD, ETH-USD):", 
+                                  title="Cryptocurrency Symbol", default=CRYPTO_NAME)
+
+    # Validate the input symbol
+    if new_symbol:
+        CRYPTO_NAME = new_symbol.strip().upper()
+        easygui.msgbox(f"Cryptocurrency symbol set to: {CRYPTO_NAME}", title="Symbol Changed")
+    else:
+        easygui.msgbox("Invalid input. Keeping the default symbol: BTC-USD.", title="Invalid Symbol")
+
+# Function to ask the user whether they want to view the graph
+def display_graph():
+    # Ask user if they want to display the graph
+    choice = easygui.buttonbox("Would you like to display the cryptocurrency graph?", choices=["Yes", "No"])
+    if choice == "Yes":
+        # Fetch the cryptocurrency data
+        crypto_data = get_data(CRYPTO_NAME)
+
+        if crypto_data is None:
+            return
+
+        # Create the plot and get the HTML file path
+        html_file = create_graph(crypto_data)
+        if html_file is None:
+            return
+
+        # Let the user know the graph has been generated
+        easygui.msgbox(f"The graph for {CRYPTO_NAME} has been generated! Opening it in your default browser.", title="Graph Generated")
+
+        # Open the HTML file in the default web browser
+        webbrowser.open(html_file)
+
+# Main function to run the program
 def run():
-    crypto_data = get_data()
+    # Display an introductory message
+    easygui.msgbox("Welcome to the Cryptocurrency Price Analysis Tool!", title="Welcome")
 
-    graph = go.Figure(data=[
-        go.Candlestick(
-            x=crypto_data.index,
-            open=crypto_data['Open'],
-            high=crypto_data['High'],
-            low=crypto_data['Low'],
-            close=crypto_data['Close'],
-            name='Candlesticks',
-            increasing_line_color='blue',
-            decreasing_line_color='grey'
-        ),
-        go.Scatter(
-            x=crypto_data.index,
-            y=crypto_data['Close'].rolling(window=30).mean(),
-            name='30 Day Moving Average',
-            mode='lines'
-        )
-    ])
+    # Give the user the option to change the cryptocurrency symbol
+    get_symbol_from_user()
 
-    graph.update_layout(title='Lakshya Crypto Price Graph Analysis', yaxis_title='Price (USD)')
-    graph.show()
+    # Call the display_graph function to start the process
+    display_graph()
 
-run()
+# Run the program
+if __name__ == "__main__":
+    run()
